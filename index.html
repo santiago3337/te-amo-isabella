@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Devourer: Human Rampage</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;700&family=Creepster&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Chakra Petch', sans-serif;
+            background-color: #090a0f;
+            color: #f3f4f6;
+            touch-action: manipulation;
+            overflow: hidden;
+            user-select: none;
+        }
+        .font-creep {
+            font-family: 'Creepster', cursive;
+        }
+        .glow-text {
+            text-shadow: 0 0 10px rgba(239, 68, 68, 0.7), 0 0 20px rgba(220, 38, 38, 0.5);
+        }
+        .glow-green {
+            text-shadow: 0 0 10px rgba(34, 197, 94, 0.7);
+        }
+        .crt-overlay {
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+            background-size: 100% 3px, 6px 100%;
+            pointer-events: none;
+        }
+        canvas {
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center relative bg-slate-950 text-white">
+
+    <!-- CRT Effect Overlay -->
+    <div class="absolute inset-0 crt-overlay z-10"></div>
+
+    <!-- HUD Header -->
+    <header class="w-full max-w-4xl px-4 py-3 z-20 flex justify-between items-center bg-slate-900/80 backdrop-blur border-b border-red-900/50">
+        <div>
+            <h1 class="text-2xl md:text-3xl font-creep text-red-500 tracking-wider glow-text">DEVOURER</h1>
+            <p class="text-xs text-slate-400">HUMAN RAMPAGE v2.0</p>
+        </div>
+        <div class="flex gap-4 md:gap-8 text-center">
+            <div>
+                <span class="block text-xs uppercase text-slate-400">Humanos Devorados</span>
+                <span id="score-display" class="text-xl md:text-2xl font-bold text-red-400">0</span>
+            </div>
+            <div>
+                <span class="block text-xs uppercase text-slate-400">Récord</span>
+                <span id="highscore-display" class="text-xl md:text-2xl font-bold text-amber-400">0</span>
+            </div>
+            <div>
+                <span class="block text-xs uppercase text-slate-400">Multiplicador</span>
+                <span id="multiplier-display" class="text-xl md:text-2xl font-bold text-emerald-400">x1</span>
+            </div>
+        </div>
+        <div>
+            <button id="audio-toggle-btn" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-slate-300 border border-slate-700 transition">
+                <svg id="audio-on-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg>
+                <svg id="audio-off-icon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z border-red-500"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Canvas Wrapper -->
+    <main id="canvas-container" class="relative flex-1 w-full max-w-4xl flex justify-center items-center p-2 z-0">
+        <canvas id="gameCanvas" class="bg-slate-900 border-2 border-red-900/60 rounded-xl shadow-2xl shadow-red-950/40"></canvas>
+
+        <!-- START MODAL -->
+        <div id="start-modal" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col justify-center items-center z-30 p-6 text-center">
+            <h2 class="text-5xl md:text-6xl font-creep text-red-600 mb-2 glow-text">DEVOURER</h2>
+            <p class="text-slate-300 max-w-md mb-6">Eres una criatura subterránea insaciable. Acecha la superficie, devora a los humanos despavoridos y crece sin límites. ¡Cuidado con estrellarte o te autodestruirás!</p>
+            
+            <div class="grid grid-cols-2 gap-4 text-xs text-slate-400 mb-6 max-w-xs text-left bg-slate-900/80 p-4 rounded-lg border border-slate-800">
+                <div>🟩 <span class="text-slate-200">Humano Normal</span> (+10 pts)</div>
+                <div>⚡ <span class="text-slate-200">Humano Rápido</span> (+25 pts)</div>
+                <div>🛡️ <span class="text-slate-200">Humano Blindado</span> (+50 pts)</div>
+                <div>💥 <span class="text-slate-200">Choque</span> = Explosión</div>
+            </div>
+
+            <button id="start-btn" class="px-8 py-4 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-900/50 transform hover:scale-105 transition">
+                ¡INICIAR CACERÍA!
+            </button>
+            <p class="text-xs text-slate-500 mt-4">Usa las teclas de Dirección, WASD o la pantalla táctil.</p>
+        </div>
+
+        <!-- GAME OVER MODAL -->
+        <div id="gameover-modal" class="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col justify-center items-center z-30 p-6 text-center hidden">
+            <h2 class="text-5xl font-creep text-red-600 mb-2 glow-text">¡EXPLOSIÓN FATAL!</h2>
+            <p id="death-reason" class="text-slate-300 mb-4">Te has destruido por completo.</p>
+            
+            <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-6 mb-6 min-w-[280px]">
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="text-slate-400">Humanos Devorados:</span>
+                    <span id="final-score" class="font-bold text-red-400 text-lg">0</span>
+                </div>
+                <div class="flex justify-between py-2 border-b border-slate-800">
+                    <span class="text-slate-400">Mejor Puntuación:</span>
+                    <span id="final-highscore" class="font-bold text-amber-400 text-lg">0</span>
+                </div>
+                <div class="flex justify-between py-2">
+                    <span class="text-slate-400">Nivel de Masacre:</span>
+                    <span id="final-rank" class="font-bold text-emerald-400">Gusano Hambriento</span>
+                </div>
+            </div>
+
+            <button id="restart-btn" class="px-8 py-4 bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-lg rounded-xl shadow-lg shadow-red-900/50 transform hover:scale-105 transition">
+                REINTENTAR MASACRE
+            </button>
+        </div>
+    </main>
+
+    <!-- Mobile Touch D-Pad -->
+    <footer class="w-full max-w-4xl p-3 z-20 flex justify-center items-center md:hidden">
+        <div class="grid grid-cols-3 gap-2 w-48 h-48">
+            <div></div>
+            <button id="btn-up" class="bg-slate-800 active:bg-red-700 text-slate-200 rounded-xl flex items-center justify-center text-2xl font-bold border border-slate-700 shadow">▲</button>
+            <div></div>
+            <button id="btn-left" class="bg-slate-800 active:bg-red-700 text-slate-200 rounded-xl flex items-center justify-center text-2xl font-bold border border-slate-700 shadow">◀</button>
+            <div class="flex items-center justify-center text-slate-600 text-xs font-bold">PAD</div>
+            <button id="btn-right" class="bg-slate-800 active:bg-red-700 text-slate-200 rounded-xl flex items-center justify-center text-2xl font-bold border border-slate-700 shadow">▶</button>
+            <div></div>
+            <button id="btn-down" class="bg-slate-800 active:bg-red-700 text-slate-200 rounded-xl flex items-center justify-center text-2xl font-bold border border-slate-700 shadow">▼</button>
+            <div></div>
+        </div>
+    </footer>
+
+    <script>
+        // Web Audio Synthesizer for procedural retro audio
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioCtx();
+                }
+            }
+
+            playEat() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(600, this.ctx.currentTime + 0.1);
+                osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.2);
+
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            }
+
+            playScream() {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(800 + Math.random() * 400, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(1200 + Math.random() * 300, this.ctx.currentTime + 0.15);
+
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
+
+            playExplosion() {
+                if (this.muted || !this.ctx) return;
+                
+                // Noise buffer for blast
+                const bufferSize = this.ctx.sampleRate * 0.8;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const output = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    output[i] = Math.random() * 2 - 1;
+                }
+
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(800, this.ctx.currentTime);
+                filter.frequency.exponentialRampToValueAtTime(30, this.ctx.currentTime + 0.8);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(1.0, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.8);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                noise.start();
+
+                // Sub bass bump
+                const subOsc = this.ctx.createOscillator();
+                const subGain = this.ctx.createGain();
+                subOsc.type = 'sine';
+                subOsc.frequency.setValueAtTime(150, this.ctx.currentTime);
+                subOsc.frequency.exponentialRampToValueAtTime(20, this.ctx.currentTime + 0.7);
+
+                subGain.gain.setValueAtTime(0.8, this.ctx.currentTime);
+                subGain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.7);
+
+                subOsc.connect(subGain);
+                subGain.connect(this.ctx.destination);
+
+                subOsc.start();
+                subOsc.stop(this.ctx.currentTime + 0.7);
+            }
+        }
+
+        const audio = new SoundFX();
+
+        class Particle {
+            constructor(x, y, color, size, speedX, speedY, life, isFire = false) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.size = size;
+                this.speedX = speedX;
+                this.speedY = speedY;
+                this.maxLife = life;
+                this.life = life;
+                this.isFire = isFire;
+            }
+
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                this.speedX *= 0.96;
+                this.speedY *= 0.96;
+                this.life--;
+                if (this.isFire && this.size > 0.5) {
+                    this.size -= 0.15;
+                }
+            }
+
+            draw(ctx) {
+                const alpha = Math.max(0, this.life / this.maxLife);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, Math.max(0.1, this.size), 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Human {
+            constructor(gridWidth, gridHeight, tileSize) {
+                this.tileSize = tileSize;
+                this.gridWidth = gridWidth;
+                this.gridHeight = gridHeight;
+                this.reset();
+            }
+
+            reset() {
+                this.x = Math.floor(Math.random() * (this.gridWidth - 4)) + 2;
+                this.y = Math.floor(Math.random() * (this.gridHeight - 4)) + 2;
+                
+                const typeRoll = Math.random();
+                if (typeRoll > 0.85) {
+                    this.type = 'armored'; // 50 pts, slow
+                    this.color = '#38bdf8';
+                    this.points = 50;
+                    this.speed = 0.03;
+                } else if (typeRoll > 0.65) {
+                    this.type = 'fast'; // 25 pts, fast
+                    this.color = '#facc15';
+                    this.points = 25;
+                    this.speed = 0.08;
+                } else {
+                    this.type = 'normal'; // 10 pts
+                    this.color = '#4ade80';
+                    this.points = 10;
+                    this.speed = 0.05;
+                }
+
+                this.animFrame = 0;
+                this.panic = false;
+                this.fleeTimer = 0;
+            }
+
+            update(snakeHead) {
+                this.animFrame += 0.2;
+                
+                // Panic check if snake head is close
+                const dx = this.x - snakeHead.x;
+                const dy = this.y - snakeHead.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 6) {
+                    this.panic = true;
+                    // Flee in opposite direction
+                    if (Math.random() < this.speed) {
+                        const moveX = dx > 0 ? 1 : (dx < 0 ? -1 : 0);
+                        const moveY = dy > 0 ? 1 : (dy < 0 ? -1 : 0);
+
+                        const nextX = Math.max(1, Math.min(this.gridWidth - 2, this.x + moveX));
+                        const nextY = Math.max(1, Math.min(this.gridHeight - 2, this.y + moveY));
+
+                        this.x = nextX;
+                        this.y = nextY;
+                    }
+                } else {
+                    this.panic = false;
+                    // Idle wander
+                    if (Math.random() < 0.02) {
+                        this.x = Math.max(1, Math.min(this.gridWidth - 2, this.x + (Math.floor(Math.random() * 3) - 1)));
+                        this.y = Math.max(1, Math.min(this.gridHeight - 2, this.y + (Math.floor(Math.random() * 3) - 1)));
+                    }
+                }
+            }
+
+            draw(ctx) {
+                const px = this.x * this.tileSize + this.tileSize / 2;
+                const py = this.y * this.tileSize + this.tileSize / 2;
+                const size = this.tileSize * 0.4;
+
+                ctx.save();
+                ctx.translate(px, py);
+
+                // Panic indicator
+                if (this.panic) {
+                    ctx.fillStyle = '#ef4444';
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.fillText('!', -2, -size - 4);
+                }
+
+                // Head
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(0, -size * 0.6, size * 0.35, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Body
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(0, -size * 0.25);
+                ctx.lineTo(0, size * 0.4);
+                ctx.stroke();
+
+                // Animated Legs & Arms
+                const legOffset = Math.sin(this.animFrame) * 4;
+                ctx.beginPath();
+                // Arms
+                ctx.moveTo(-size * 0.4, 0);
+                ctx.lineTo(size * 0.4, -legOffset);
+                // Legs
+                ctx.moveTo(0, size * 0.4);
+                ctx.lineTo(-size * 0.3, size * 0.9 + legOffset);
+                ctx.moveTo(0, size * 0.4);
+                ctx.lineTo(size * 0.3, size * 0.9 - legOffset);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+        }
+
+        class Game {
+            constructor() {
+                this.canvas = document.getElementById('gameCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                
+                this.tileSize = 20;
+                this.gridWidth = 30;
+                this.gridHeight = 25;
+
+                this.snake = [];
+                this.dir = { x: 1, y: 0 };
+                this.nextDir = { x: 1, y: 0 };
+                
+                this.humans = [];
+                this.particles = [];
+                this.splatters = [];
+
+                this.score = 0;
+                this.highScore = parseInt(localStorage.getItem('devourer_highscore') || '0');
+                this.multiplier = 1;
+                this.eatStreak = 0;
+
+                this.isGameOver = false;
+                this.isStarted = false;
+                this.gameSpeed = 100; // ms per tick
+                this.lastTick = 0;
+                this.shakeTime = 0;
+
+                this.resizeCanvas();
+                window.addEventListener('resize', () => this.resizeCanvas());
+
+                this.bindControls();
+                this.updateUI();
+            }
+
+            resizeCanvas() {
+                const container = document.getElementById('canvas-container');
+                const maxWidth = container.clientWidth - 20;
+                const maxHeight = container.clientHeight - 20;
+
+                // Keep ratio 30:25
+                let w = maxWidth;
+                let h = (w * 25) / 30;
+
+                if (h > maxHeight) {
+                    h = maxHeight;
+                    w = (h * 30) / 25;
+                }
+
+                this.canvas.width = w;
+                this.canvas.height = h;
+                this.tileSize = w / this.gridWidth;
+            }
+
+            init() {
+                this.snake = [
+                    { x: 10, y: 12 },
+                    { x: 9, y: 12 },
+                    { x: 8, y: 12 }
+                ];
+                this.dir = { x: 1, y: 0 };
+                this.nextDir = { x: 1, y: 0 };
+                
+                this.humans = [
+                    new Human(this.gridWidth, this.gridHeight, this.tileSize),
+                    new Human(this.gridWidth, this.gridHeight, this.tileSize)
+                ];
+
+                this.particles = [];
+                this.splatters = [];
+                this.score = 0;
+                this.multiplier = 1;
+                this.eatStreak = 0;
+                this.gameSpeed = 105;
+                this.isGameOver = false;
+                this.shakeTime = 0;
+
+                this.updateUI();
+            }
+
+            spawnHumans() {
+                while (this.humans.length < 3) {
+                    this.humans.push(new Human(this.gridWidth, this.gridHeight, this.tileSize));
+                }
+            }
+
+            bindControls() {
+                window.addEventListener('keydown', (e) => {
+                    if (!this.isStarted) return;
+                    
+                    switch (e.key.toLowerCase()) {
+                        case 'arrowup':
+                        case 'w':
+                            if (this.dir.y === 0) this.nextDir = { x: 0, y: -1 };
+                            break;
+                        case 'arrowdown':
+                        case 's':
+                            if (this.dir.y === 0) this.nextDir = { x: 0, y: 1 };
+                            break;
+                        case 'arrowleft':
+                        case 'a':
+                            if (this.dir.x === 0) this.nextDir = { x: -1, y: 0 };
+                            break;
+                        case 'arrowright':
+                        case 'd':
+                            if (this.dir.x === 0) this.nextDir = { x: 1, y: 0 };
+                            break;
+                    }
+                });
+
+                // On-screen D-Pad for Mobile
+                const addTouch = (id, x, y) => {
+                    const btn = document.getElementById(id);
+                    if (btn) {
+                        btn.addEventListener('touchstart', (e) => {
+                            e.preventDefault();
+                            if ((x !== 0 && this.dir.x === 0) || (y !== 0 && this.dir.y === 0)) {
+                                this.nextDir = { x, y };
+                            }
+                        });
+                        btn.addEventListener('click', () => {
+                            if ((x !== 0 && this.dir.x === 0) || (y !== 0 && this.dir.y === 0)) {
+                                this.nextDir = { x, y };
+                            }
+                        });
+                    }
+                };
+
+                addTouch('btn-up', 0, -1);
+                addTouch('btn-down', 0, 1);
+                addTouch('btn-left', -1, 0);
+                addTouch('btn-right', 1, 0);
+            }
+
+            update(timestamp) {
+                if (!this.isStarted) return;
+
+                // Update particles and blood splatters continuously
+                for (let i = this.particles.length - 1; i >= 0; i--) {
+                    this.particles[i].update();
+                    if (this.particles[i].life <= 0) {
+                        this.particles.splice(i, 1);
+                    }
+                }
+
+                if (this.isGameOver) return;
+
+                // Update humans
+                this.humans.forEach(h => h.update(this.snake[0]));
+
+                // Snake step tick rate
+                if (timestamp - this.lastTick > this.gameSpeed) {
+                    this.lastTick = timestamp;
+                    this.step();
+                }
+            }
+
+            step() {
+                this.dir = { ...this.nextDir };
+                const head = { x: this.snake[0].x + this.dir.x, y: this.snake[0].y + this.dir.y };
+
+                // Collision Wall Check
+                if (head.x < 0 || head.x >= this.gridWidth || head.y < 0 || head.y >= this.gridHeight) {
+                    this.triggerExplosion("¡Chocaste contra los límites de la ciudad!");
+                    return;
+                }
+
+                // Collision Self Check
+                for (let i = 0; i < this.snake.length; i++) {
+                    if (this.snake[i].x === head.x && this.snake[i].y === head.y) {
+                        this.triggerExplosion("¡Te devoraste a ti mismo en el caos!");
+                        return;
+                    }
+                }
+
+                this.snake.unshift(head);
+
+                // Check Human Eating
+                let ate = false;
+                for (let i = this.humans.length - 1; i >= 0; i--) {
+                    const h = this.humans[i];
+                    if (h.x === head.x && h.y === head.y) {
+                        this.eatHuman(h);
+                        this.humans.splice(i, 1);
+                        ate = true;
+                        break;
+                    }
+                }
+
+                if (!ate) {
+                    this.snake.pop();
+                } else {
+                    this.spawnHumans();
+                }
+            }
+
+            eatHuman(human) {
+                audio.playEat();
+                audio.playScream();
+
+                this.eatStreak++;
+                this.multiplier = 1 + Math.floor(this.eatStreak / 5);
+
+                const pointsGained = human.points * this.multiplier;
+                this.score += pointsGained;
+
+                if (this.score > this.highScore) {
+                    this.highScore = this.score;
+                    localStorage.setItem('devourer_highscore', this.highScore.toString());
+                }
+
+                // Speed up slightly
+                if (this.gameSpeed > 50) {
+                    this.gameSpeed -= 0.8;
+                }
+
+                this.updateUI();
+
+                // Create Blood & Gore Splatter
+                const px = human.x * this.tileSize + this.tileSize / 2;
+                const py = human.y * this.tileSize + this.tileSize / 2;
+
+                // Permanent Splatter on Floor
+                this.splatters.push({
+                    x: px,
+                    y: py,
+                    radius: Math.random() * (this.tileSize * 0.6) + 4,
+                    color: Math.random() > 0.3 ? '#dc2626' : '#991b1b'
+                });
+
+                // Blood particles
+                for (let i = 0; i < 20; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 5 + 1;
+                    this.particles.push(new Particle(
+                        px, py,
+                        Math.random() > 0.2 ? '#ef4444' : '#b91c1c',
+                        Math.random() * 4 + 2,
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed,
+                        Math.random() * 20 + 20
+                    ));
+                }
+            }
+
+            triggerExplosion(reason) {
+                this.isGameOver = true;
+                this.shakeTime = 30; // Camera shake intensity duration
+                audio.playExplosion();
+
+                const head = this.snake[0];
+                const headPx = head.x * this.tileSize + this.tileSize / 2;
+                const headPy = head.y * this.tileSize + this.tileSize / 2;
+
+                // Massive Fireball & Shockwave Particles for Snake Head
+                for (let i = 0; i < 150; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const speed = Math.random() * 12 + 2;
+                    const colors = ['#f97316', '#ef4444', '#eab308', '#ffffff', '#7f1d1d'];
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    
+                    this.particles.push(new Particle(
+                        headPx, headPy,
+                        color,
+                        Math.random() * 8 + 4,
+                        Math.cos(angle) * speed,
+                        Math.sin(angle) * speed,
+                        Math.random() * 40 + 30,
+                        true
+                    ));
+                }
+
+                // Explosions along the rest of snake body
+                this.snake.forEach((segment, idx) => {
+                    setTimeout(() => {
+                        const px = segment.x * this.tileSize + this.tileSize / 2;
+                        const py = segment.y * this.tileSize + this.tileSize / 2;
+
+                        for (let i = 0; i < 25; i++) {
+                            const angle = Math.random() * Math.PI * 2;
+                            const speed = Math.random() * 6 + 1;
+                            this.particles.push(new Particle(
+                                px, py,
+                                '#ef4444',
+                                Math.random() * 5 + 2,
+                                Math.cos(angle) * speed,
+                                Math.sin(angle) * speed,
+                                Math.random() * 30 + 15,
+                                true
+                            ));
+                        }
+                    }, idx * 40);
+                });
+
+                // Show Game Over Modal
+                setTimeout(() => {
+                    document.getElementById('death-reason').innerText = reason;
+                    document.getElementById('final-score').innerText = this.score;
+                    document.getElementById('final-highscore').innerText = this.highScore;
+
+                    let rank = "Gusano Hambriento";
+                    if (this.score > 500) rank = "Leviatán Asesino";
+                    else if (this.score > 250) rank = "Bestia Subterránea";
+                    else if (this.score > 100) rank = "Depredador Urbano";
+                    
+                    document.getElementById('final-rank').innerText = rank;
+                    document.getElementById('gameover-modal').classList.remove('hidden');
+                }, 1200);
+            }
+
+            updateUI() {
+                document.getElementById('score-display').innerText = this.score;
+                document.getElementById('highscore-display').innerText = this.highScore;
+                document.getElementById('multiplier-display').innerText = `x${this.multiplier}`;
+            }
+
+            draw() {
+                this.ctx.save();
+
+                // Apply Screen Shake on explosion
+                if (this.shakeTime > 0) {
+                    const dx = (Math.random() - 0.5) * this.shakeTime * 0.8;
+                    const dy = (Math.random() - 0.5) * this.shakeTime * 0.8;
+                    this.ctx.translate(dx, dy);
+                    this.shakeTime--;
+                }
+
+                // Clear background with grid pattern
+                this.ctx.fillStyle = '#0f172a';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+                // Grid lines
+                this.ctx.strokeStyle = '#1e293b';
+                this.ctx.lineWidth = 1;
+                for (let x = 0; x <= this.canvas.width; x += this.tileSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(x, 0);
+                    this.ctx.lineTo(x, this.canvas.height);
+                    this.ctx.stroke();
+                }
+                for (let y = 0; y <= this.canvas.height; y += this.tileSize) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, y);
+                    this.ctx.lineTo(this.canvas.width, y);
+                    this.ctx.stroke();
+                }
+
+                // Draw permanent blood splatters
+                this.splatters.forEach(s => {
+                    this.ctx.fillStyle = s.color;
+                    this.ctx.beginPath();
+                    this.ctx.arc(s.x, s.y, s.radius, 0, Math.PI * 2);
+                    this.ctx.fill();
+                });
+
+                // Draw Humans
+                if (!this.isGameOver) {
+                    this.humans.forEach(h => h.draw(this.ctx));
+                }
+
+                // Draw Snake Monster
+                if (!this.isGameOver || this.shakeTime > 15) {
+                    this.snake.forEach((seg, index) => {
+                        const px = seg.x * this.tileSize;
+                        const py = seg.y * this.tileSize;
+                        const padding = 1;
+
+                        if (index === 0) {
+                            // Head
+                            this.ctx.fillStyle = '#dc2626'; // Vivid Red Head
+                            this.ctx.beginPath();
+                            this.ctx.roundRect(px + padding, py + padding, this.tileSize - padding * 2, this.tileSize - padding * 2, 6);
+                            this.ctx.fill();
+
+                            // Glowing Eyes
+                            this.ctx.fillStyle = '#fef08a';
+                            const eyeSize = this.tileSize * 0.2;
+                            this.ctx.fillRect(px + 4, py + 4, eyeSize, eyeSize);
+                            this.ctx.fillRect(px + this.tileSize - 4 - eyeSize, py + 4, eyeSize, eyeSize);
+                        } else {
+                            // Body Segments gradient
+                            const greenFactor = Math.min(200, index * 8);
+                            this.ctx.fillStyle = `rgb(${180 - index * 2}, ${greenFactor}, 60)`;
+                            this.ctx.beginPath();
+                            this.ctx.roundRect(px + padding, py + padding, this.tileSize - padding * 2, this.tileSize - padding * 2, 4);
+                            this.ctx.fill();
+                        }
+                    });
+                }
+
+                // Draw Explosion & Blood Particles
+                this.particles.forEach(p => p.draw(this.ctx));
+
+                this.ctx.restore();
+            }
+        }
+
+        let game;
+
+        window.onload = () => {
+            game = new Game();
+
+            function gameLoop(timestamp) {
+                game.update(timestamp);
+                game.draw();
+                requestAnimationFrame(gameLoop);
+            }
+
+            requestAnimationFrame(gameLoop);
+
+            // Audio Toggle
+            const audioBtn = document.getElementById('audio-toggle-btn');
+            const iconOn = document.getElementById('audio-on-icon');
+            const iconOff = document.getElementById('audio-off-icon');
+
+            audioBtn.addEventListener('click', () => {
+                audio.init();
+                audio.muted = !audio.muted;
+                if (audio.muted) {
+                    iconOn.classList.add('hidden');
+                    iconOff.classList.remove('hidden');
+                } else {
+                    iconOn.classList.remove('hidden');
+                    iconOff.classList.add('hidden');
+                }
+            });
+
+            // Start Game
+            document.getElementById('start-btn').addEventListener('click', () => {
+                audio.init();
+                document.getElementById('start-modal').classList.add('hidden');
+                game.isStarted = true;
+                game.init();
+            });
+
+            // Restart Game
+            document.getElementById('restart-btn').addEventListener('click', () => {
+                document.getElementById('gameover-modal').classList.add('hidden');
+                game.init();
+            });
+        };
+    </script>
+</body>
+</html>
